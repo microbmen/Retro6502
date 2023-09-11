@@ -34,6 +34,9 @@ D-Pad is exact
 
 //////////////////////////////////////////////////////////////////////////*/
 
+//for testing change to 400
+const int PairTrim = 100;
+
 //#include <avr/pgmspace.h>
 //#include <Usb.h>
 #include <usbhub.h>
@@ -53,8 +56,10 @@ int Butt0Pin = A4;
 int Butt1Pin = A5;
 
 //Max values for X and Y, 155 seems to be the correct voltage for the Apple II (pentimeter to gpio)
-const float maxX = 155;
+const float maxX = 153;
+int NewmaxX;
 const float maxY = 155;
+int NewmaxY;
 
 // we want touch to retain values and not jump to center
 float OldTXvalue;
@@ -69,6 +74,8 @@ int counterDisconnect = 0;
 int baseColor = 0;  // 0 blue, 1 yellow, 2 green, 3 red
 bool printTouch;
 bool RumbleOn;
+bool SnapOn;
+bool RStretch;
 
 USB Usb;
 BTD Btd(&Usb);  // You have to create the Bluetooth Dongle instance like so
@@ -108,7 +115,7 @@ void setup() {
   Serial.println(TrimPinVal);
 
   // no center value should ever be below 100.... (famous last words, but for me its solid)
-  if (TrimPinVal <= 100) {
+  if (TrimPinVal <= PairTrim) {
     Serial.println("Pairing...");
     PS4.disconnect();
     PS4.pair();
@@ -127,12 +134,17 @@ void loop() {
 
   //Calibrate all initial values to center, needs to read in the loop for realtime adj.
   float calibrate = float(analogRead(TrimPin)) / 1023.000;
-  float Xvalue = maxX * calibrate;
-  float Yvalue = maxY * calibrate;
-  float LXvalue = maxX * calibrate;
-  float LYvalue = maxY * calibrate;
-  float RXvalue = maxX * calibrate;
-  float RYvalue = maxY * calibrate;
+  float Xcenter = maxX * calibrate;
+  float Ycenter = maxY * calibrate;
+  //calculate a new max based on center - center *should* be the half way point.
+  NewmaxX = (Xcenter * 2);
+  NewmaxY = (Ycenter * 2);
+  float Xvalue;
+  float Yvalue;
+  float LXvalue;
+  float LYvalue;
+  float RXvalue;
+  float RYvalue;
 
   if (PS4.connected()) {
 
@@ -147,12 +159,12 @@ void loop() {
       if (PS4.getAnalogHat(LeftHatX) > 137 || PS4.getAnalogHat(LeftHatX) < 117) {
         LXvalue = PS4.getAnalogHat(LeftHatX);
       } else
-        LXvalue = maxX * calibrate;
+        LXvalue = Xcenter;
 
       if (PS4.getAnalogHat(LeftHatY) > 137 || PS4.getAnalogHat(LeftHatY) < 117) {
         LYvalue = PS4.getAnalogHat(LeftHatY);
       } else
-        LYvalue = maxY * calibrate;
+        LYvalue = Ycenter;
     }
 
     // left analog take the priority
@@ -161,33 +173,40 @@ void loop() {
       if (PS4.getAnalogHat(RightHatX) > 137 || PS4.getAnalogHat(RightHatX) < 117) {
         RXvalue = PS4.getAnalogHat(RightHatX);
       } else
-        RXvalue = maxX * calibrate;
+        RXvalue = Xcenter;
       if (PS4.getAnalogHat(RightHatY) > 137 || PS4.getAnalogHat(RightHatY) < 117) {
         RYvalue = PS4.getAnalogHat(RightHatY);
       } else
-        RYvalue = maxY * calibrate;
+        RYvalue = Ycenter;
     }
 
     // Write out left analog
     if (useLeftAnalog == 1) {
       // if its not on center, then stretch the value from 0 to twice center with a max of maxX...
       // limit range so we can reach the corners.
-      if (LXvalue != (maxX * calibrate)) LXvalue = constrain(map(LXvalue, 35, 220, 0, ((maxX * calibrate) * 2)), 0, maxX);
-      if (LYvalue != (maxY * calibrate)) LYvalue = constrain(map(LYvalue, 35, 220, 0, ((maxY * calibrate) * 2)), 0, maxY);
+      if (LXvalue != (maxX * calibrate)) LXvalue = constrain(map(LXvalue, 35, 220, 0, NewmaxX), 0, NewmaxX);
+      if (LYvalue != (maxY * calibrate)) LYvalue = constrain(map(LYvalue, 35, 220, 0, NewmaxY), 0, NewmaxY);
 
       Serial.print("LAnalog: X: ");
       Serial.print(LXvalue);
       Serial.print(" Y: ");
       Serial.print(LYvalue);
       Serial.println();
-      sendXYvalues(LXvalue, LYvalue);
+      if (SnapOn) CornerSnap(LXvalue, LYvalue);
+      else sendXYvalues(LXvalue, LYvalue);
     }
 
     //write out right analog
     if (useRightAnalog == 1) {
-      // full range
-      if (RXvalue != (maxX * calibrate)) RXvalue = constrain(map(RXvalue, 0, 255, 0, maxX), 0, maxX);
-      if (RYvalue != (maxY * calibrate)) RYvalue = constrain(map(RYvalue, 0, 255, 0, maxY), 0, maxY);
+      if (RStretch) {
+        //stretched
+        if (RXvalue != (maxX * calibrate)) RXvalue = constrain(map(RXvalue, 35, 220, 0, NewmaxX), 0, NewmaxX);
+        if (RYvalue != (maxY * calibrate)) RYvalue = constrain(map(RYvalue, 35, 220, 0, NewmaxY), 0, NewmaxY);
+      } else {
+        // full range
+        if (RXvalue != (maxX * calibrate)) RXvalue = constrain(map(RXvalue, 0, 255, 0, NewmaxX), 0, NewmaxX);
+        if (RYvalue != (maxY * calibrate)) RYvalue = constrain(map(RYvalue, 0, 255, 0, NewmaxY), 0, NewmaxY);
+      }
 
       Serial.print("RAnalog: X: ");
       Serial.print(RXvalue);
@@ -215,8 +234,8 @@ void loop() {
       OldTYvalue = TYvalue;
 
       //write out touch
-      if (TXvalue != (maxX * calibrate)) TXvalue = constrain(map(TXvalue, 0, 1919, 0, maxX), 0, maxX);
-      if (TYvalue != (maxY * calibrate)) TYvalue = constrain(map(TYvalue, 0, 941, 0, maxY), 0, maxY);
+      if (TXvalue != (maxX * calibrate)) TXvalue = constrain(map(TXvalue, 0, 1919, 0, NewmaxX), 0, NewmaxX);
+      if (TYvalue != (maxY * calibrate)) TYvalue = constrain(map(TYvalue, 0, 941, 0, NewmaxY), 0, NewmaxY);
 
       Serial.print("Touch: X: ");
       Serial.print(TXvalue);
@@ -234,20 +253,20 @@ void loop() {
         Yvalue = 0;
       }
       if (PS4.getButtonPress(DOWN)) {
-        Yvalue = maxY;
+        Yvalue = NewmaxY;
       }
     } else
-      Yvalue = maxY * calibrate;
+      Yvalue = Ycenter;
 
     if (PS4.getButtonPress(LEFT) || PS4.getButtonPress(RIGHT)) {
       if (PS4.getButtonPress(LEFT)) {
         Xvalue = 0;
       }
       if (PS4.getButtonPress(RIGHT)) {
-        Xvalue = maxX;
+        Xvalue = NewmaxX;
       }
     } else
-      Xvalue = maxX * calibrate;
+      Xvalue = Xcenter;
 
     if (useLeftAnalog == 0 && useRightAnalog == 0 && !printTouch) {
       Serial.print("Digital: X: ");
@@ -270,6 +289,14 @@ void loop() {
       Serial.println(F("Menu"));
       ToggleRumble();
     }
+    if (PS4.getButtonClick(L3)) {
+      Serial.println(F("L3"));
+      SnapOn = !SnapOn;
+    }
+    if (PS4.getButtonClick(R3)) {
+      Serial.println(F("R3"));
+      RStretch = !RStretch;
+    }
 
     if (PS4.getButtonClick(PS)) {
       Serial.print(F("\r\nPS"));
@@ -287,14 +314,14 @@ void loop() {
       PS4.setRumbleOn((PS4.getAnalogButton(L2) * 2), (PS4.getAnalogButton(R2) * 2));
     }
 
-    if (PS4.getButtonPress(CIRCLE) || PS4.getButtonPress(SQUARE) || PS4.getButtonPress(R1) || PS4.getButtonPress(L2) || PS4.getButtonPress(L3)) {
+    if (PS4.getButtonPress(CIRCLE) || PS4.getButtonPress(SQUARE) || PS4.getButtonPress(R1) || PS4.getButtonPress(L2)) {
       // on 8BitDo B is A, and X is Y
       Serial.println(Butt0Pin);
       digitalWrite(Butt0Pin, HIGH);
     } else
       digitalWrite(Butt0Pin, LOW);
 
-    if (PS4.getButtonPress(CROSS) || PS4.getButtonPress(TRIANGLE) || PS4.getButtonPress(L1) || PS4.getButtonPress(R2) || PS4.getButtonPress(R3)) {
+    if (PS4.getButtonPress(CROSS) || PS4.getButtonPress(TRIANGLE) || PS4.getButtonPress(L1) || PS4.getButtonPress(R2)) {
       // on 8BitDo A is B, and Y is X
       Serial.println(Butt1Pin);
       digitalWrite(Butt1Pin, HIGH);
@@ -306,20 +333,46 @@ void loop() {
     if (FirstRun == 0) {
       FirstRun = 1;
       Serial.print("Initial Values: X: ");
-      Serial.print(maxX * calibrate);
+      Serial.print(Xcenter);
       Serial.print(" Y: ");
-      Serial.println(maxY * calibrate);
-      sendXYvalues((maxX * calibrate), (maxY * calibrate));
+      Serial.println(Ycenter);
+      sendXYvalues(Xcenter, Ycenter);
 
       //Touch is centered only on the first loop, so that we remeber its position
-      TXvalue = maxX * calibrate;
-      TYvalue = maxY * calibrate;
+      TXvalue = Xcenter;
+      TYvalue = Ycenter;
     }
   }
 }
 
 //Functions
 //////////////////////////////////////////
+
+void CornerSnap(int CXvalue, int CYvalue) {
+  //corner snap, snaps x and y into the corners when its close
+  int pullval = 20;
+  //bottom right
+  if ((CXvalue >= (NewmaxX - pullval)) && (CYvalue >= (NewmaxY - pullval))) {
+    CXvalue = NewmaxX;
+    CYvalue = NewmaxY;
+  }
+  //bottom left
+  if ((CXvalue <= pullval) && (CYvalue >= (NewmaxY - pullval))) {
+    CXvalue = 0;
+    CYvalue = NewmaxY;
+  }
+  //top right
+  if ((CXvalue >= (NewmaxX - pullval)) && (CYvalue < pullval)) {
+    CXvalue = NewmaxX;
+    CYvalue = 0;
+  }
+  //top left
+  if ((CXvalue <= pullval) && (CYvalue < pullval)) {
+    CXvalue = 0;
+    CYvalue = 0;
+  }
+  sendXYvalues(CXvalue, CYvalue);
+}
 
 void SetLED() {  // order counts ...
   if (printTouch) PS4.setLed(Green);
