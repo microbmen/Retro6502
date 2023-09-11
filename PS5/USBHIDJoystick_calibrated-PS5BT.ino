@@ -34,10 +34,10 @@ D-Pad is exact
 
 //////////////////////////////////////////////////////////////////////////*/
 
-//#include <avr/pgmspace.h>
-//#include <Usb.h>
+//for testing change to 400
+const int PairTrim = 100;
+
 #include <usbhub.h>
-//#include <usbhid.h>
 #include <PS5BT.h>
 
 // Satisfy the IDE, which needs to see the include statement in the ino too.
@@ -53,8 +53,10 @@ int Butt0Pin = A4;
 int Butt1Pin = A5;
 
 //Max values for X and Y, 155 seems to be the correct voltage for the Apple II (pentimeter to gpio)
-const int maxX = 155;
+const int maxX = 153;
+int NewmaxX;
 const int maxY = 155;
+int NewmaxY;
 
 // we want touch to retain values and not jump to center
 int OldTXvalue;
@@ -70,6 +72,8 @@ int counterDis = 0;
 int baseColor = 0;  // 0 blue, 1 yellow, 2 green, 3 red
 bool RumbleOn;
 bool printTouch;
+bool SnapOn;
+bool RStretch;
 
 USB Usb;
 BTD Btd(&Usb);  // You have to create the Bluetooth Dongle instance like so
@@ -109,7 +113,7 @@ void setup() {
   Serial.println(TrimPinVal);
 
   // no center value should ever be below 100.... (famous last words, but for me its solid)
-  if (TrimPinVal <= 100) {
+  if (TrimPinVal <= PairTrim) {
     Serial.println(F("Pair"));
     PS5.disconnect();
     PS5.pair();
@@ -128,8 +132,10 @@ void loop() {
 
   //Calibrate all initial values to center, needs to read in the loop for realtime adj.
   float calibrate = float(analogRead(TrimPin)) / 1023.000;
-  int centerX = (maxX * calibrate);
-  int centerY = (maxY * calibrate);
+  int Xcenter = (maxX * calibrate);
+  int Ycenter = (maxY * calibrate);
+  NewmaxX = (Xcenter * 2);
+  NewmaxY = (Ycenter * 2);
   int LXvalue;
   int LYvalue;
   int RXvalue;
@@ -146,24 +152,28 @@ void loop() {
     ////////////////////////////////////////
 
     // Analogs
-    if ((PS5.getAnalogHat(LeftHatX) > 137 || PS5.getAnalogHat(LeftHatX) < 117 || PS5.getAnalogHat(LeftHatY) > 137 || PS5.getAnalogHat(LeftHatY) < 117) && !printTouch ) {
+    if ((PS5.getAnalogHat(LeftHatX) > 137 || PS5.getAnalogHat(LeftHatX) < 117 || PS5.getAnalogHat(LeftHatY) > 137 || PS5.getAnalogHat(LeftHatY) < 117) && !printTouch) {
       useLeftAnalog = 1;
       if (PS5.getAnalogHat(LeftHatX) > 137 || PS5.getAnalogHat(LeftHatX) < 117) {
         LXvalue = PS5.getAnalogHat(LeftHatX);
       } else
-        LXvalue = centerX;
+        LXvalue = Xcenter;
 
       if (PS5.getAnalogHat(LeftHatY) > 137 || PS5.getAnalogHat(LeftHatY) < 117) {
         LYvalue = PS5.getAnalogHat(LeftHatY);
       } else
-        LYvalue = centerY;
+        LYvalue = Ycenter;
       // if its not on center, then stretch the value from 0 to twice center with a max of maxX...
       // limit range so we can reach the corners.
-      if (LXvalue != (centerX)) LXvalue = constrain(map(LXvalue, 35, 220, 0, ((centerX)*2)), 0, maxX);
-      if (LYvalue != (centerY)) LYvalue = constrain(map(LYvalue, 35, 220, 0, ((centerY)*2)), 0, maxY);
+      if (LXvalue != (Xcenter)) LXvalue = constrain(map(LXvalue, 35, 220, 0, (NewmaxX)), 0, (NewmaxX));
+      if (LYvalue != (Ycenter)) LYvalue = constrain(map(LYvalue, 35, 220, 0, (NewmaxY)), 0, (NewmaxY));
 
-      Serial.print(F("LA:"));
-      serialSend(LXvalue, LYvalue);
+      //Serial.print(F("LA:"));
+      if (SnapOn) {
+        CornerSnap(LXvalue, LYvalue);
+      } else {
+        serialSend(LXvalue, LYvalue);
+      }
     }
 
     if ((PS5.getAnalogHat(RightHatX) > 137 || PS5.getAnalogHat(RightHatX) < 117 || PS5.getAnalogHat(RightHatY) > 137 || PS5.getAnalogHat(RightHatY) < 117) && useLeftAnalog == 0 && !printTouch) {
@@ -171,21 +181,27 @@ void loop() {
       if (PS5.getAnalogHat(RightHatX) > 137 || PS5.getAnalogHat(RightHatX) < 117) {
         RXvalue = PS5.getAnalogHat(RightHatX);
       } else
-        RXvalue = centerX;
+        RXvalue = Xcenter;
       if (PS5.getAnalogHat(RightHatY) > 137 || PS5.getAnalogHat(RightHatY) < 117) {
         RYvalue = PS5.getAnalogHat(RightHatY);
       } else
-        RYvalue = centerY;
-      if (RXvalue != (centerX)) RXvalue = constrain(map(RXvalue, 0, 255, 0, maxX), 0, maxX);
-      if (RYvalue != (centerY)) RYvalue = constrain(map(RYvalue, 0, 255, 0, maxY), 0, maxY);
+        RYvalue = Ycenter;
 
-      Serial.print(F("RA:"));
+      if (RStretch) {
+        if (RXvalue != (Xcenter)) RXvalue = constrain(map(RXvalue, 35, 220, 0, (NewmaxX)), 0, (NewmaxX));
+        if (RYvalue != (Ycenter)) RYvalue = constrain(map(RYvalue, 35, 220, 0, (NewmaxY)), 0, (NewmaxY));
+      } else {
+        if (RXvalue != (Xcenter)) RXvalue = constrain(map(RXvalue, 0, 255, 0, (NewmaxX)), 0, (NewmaxX));
+        if (RYvalue != (Ycenter)) RYvalue = constrain(map(RYvalue, 0, 255, 0, (NewmaxY)), 0, (NewmaxY));
+      }
+
+      //Serial.print(F("RA:"));
       serialSend(RXvalue, RYvalue);
     }
 
     // Touch pad
     if (PS5.getButtonClick(TOUCHPAD)) {
-      Serial.println(F("Touch"));
+      //Serial.println(F("Touch"));
       // turns blue, but if printtouch is true, then it will immediately turn red below.
       printTouch = !printTouch;  //nice way to do a toggle, negate the boolean
     }
@@ -201,10 +217,10 @@ void loop() {
       OldTYvalue = TYvalue;
 
       //write out touch
-      if (TXvalue != (centerX)) TXvalue = constrain(map(TXvalue, 0, 1919, 0, maxX), 0, maxX);
-      if (TYvalue != (centerY)) TYvalue = constrain(map(TYvalue, 0, 941, 0, maxY), 0, maxY);
+      if (TXvalue != (Xcenter)) TXvalue = constrain(map(TXvalue, 0, 1919, 0, (NewmaxX)), 0, (NewmaxX));
+      if (TYvalue != (Ycenter)) TYvalue = constrain(map(TYvalue, 0, 941, 0, (NewmaxY)), 0, (NewmaxY));
 
-      Serial.print(F("T:"));
+      //Serial.print(F("T:"));
       serialSend(TXvalue, TYvalue);
     }
     //}
@@ -216,23 +232,23 @@ void loop() {
         Yvalue = 0;
       }
       if (PS5.getButtonPress(DOWN)) {
-        Yvalue = maxY;
+        Yvalue = NewmaxY;
       }
     } else
-      Yvalue = centerY;
+      Yvalue = Ycenter;
 
     if (PS5.getButtonPress(LEFT) || PS5.getButtonPress(RIGHT)) {
       if (PS5.getButtonPress(LEFT)) {
         Xvalue = 0;
       }
       if (PS5.getButtonPress(RIGHT)) {
-        Xvalue = maxX;
+        Xvalue = NewmaxX;
       }
     } else
-      Xvalue = centerX;
+      Xvalue = Xcenter;
 
     if (useLeftAnalog == 0 && useRightAnalog == 0 && !printTouch) {
-      Serial.print(F("D:"));
+      //Serial.print(F("D:"));
       serialSend(Xvalue, Yvalue);
     }
 
@@ -251,6 +267,16 @@ void loop() {
       ToggleRumble();
     }
 
+    if (PS5.getButtonClick(L3)) {
+      //Serial.println(F("L3"));
+      SnapOn = !SnapOn;
+    }
+
+    if (PS5.getButtonClick(R3)) {
+      //Serial.println(F("R3"));
+      RStretch = !RStretch;
+    }
+
     if (PS5.getButtonClick(PS)) {
       //Serial.println(F("PS"));
       counterDis++;
@@ -267,14 +293,14 @@ void loop() {
       PS5.setRumbleOn((PS5.getAnalogButton(L2) * 2), (PS5.getAnalogButton(R2) * 2));
     }
 
-    if (PS5.getButtonPress(CIRCLE) || PS5.getButtonPress(SQUARE) || PS5.getButtonPress(R1) || PS5.getButtonPress(L2) || PS5.getButtonPress(L3)) {
+    if (PS5.getButtonPress(CIRCLE) || PS5.getButtonPress(SQUARE) || PS5.getButtonPress(R1) || PS5.getButtonPress(L2)) {
       // on 8BitDo B is A, and X is Y
       Serial.println(Butt0Pin);
       digitalWrite(Butt0Pin, HIGH);
     } else
       digitalWrite(Butt0Pin, LOW);
 
-    if (PS5.getButtonPress(CROSS) || PS5.getButtonPress(TRIANGLE) || PS5.getButtonPress(L1) || PS5.getButtonPress(R2) || PS5.getButtonPress(R3)) {
+    if (PS5.getButtonPress(CROSS) || PS5.getButtonPress(TRIANGLE) || PS5.getButtonPress(L1) || PS5.getButtonPress(R2)) {
       // on 8BitDo A is B, and Y is X
       Serial.println(Butt1Pin);
       digitalWrite(Butt1Pin, HIGH);
@@ -286,11 +312,11 @@ void loop() {
     if (FirstRun == 0) {
       FirstRun = 1;
       Serial.print(F("Init:"));
-      serialSend((centerX), (centerY));
+      serialSend((Xcenter), (Ycenter));
 
       //Touch is centered only on the first loop, so that we remeber its position
-      TXvalue = centerX;
-      TYvalue = centerY;
+      TXvalue = Xcenter;
+      TYvalue = Ycenter;
     }
   }
 }
@@ -298,13 +324,44 @@ void loop() {
 //Functions
 //////////////////////////////////////////
 
+void CornerSnap(int CXvalue, int CYvalue) {
+  //corner snap, snaps x and y into the corners when its close
+  int pullval = 20;
+  //bottom right
+  if ((CXvalue >= (NewmaxX - pullval)) && (CYvalue >= (NewmaxY - pullval))) {
+    CXvalue = NewmaxX;
+    CYvalue = NewmaxY;
+  }
+  //bottom left
+  if ((CXvalue <= pullval) && (CYvalue >= (NewmaxY - pullval))) {
+    CXvalue = 0;
+    CYvalue = NewmaxY;
+  }
+  //top right
+  if ((CXvalue >= (NewmaxX - pullval)) && (CYvalue < pullval)) {
+    CXvalue = NewmaxX;
+    CYvalue = 0;
+  }
+  //top left
+  if ((CXvalue <= pullval) && (CYvalue < pullval)) {
+    CXvalue = 0;
+    CYvalue = 0;
+  }
+  serialSend(CXvalue, CYvalue);
+}
+
 void SetLED() {  // order counts ...
   if (printTouch) PS5.setLed(Green);
   else if (reverseButs == 0 && RumbleOn == 0) PS5.setLed(Yellow);
   else if (reverseButs == 1 && RumbleOn == 1) PS5.setLed(Purple);
   else if (reverseButs == 1) PS5.setLed(Blue);
-  else if (RumbleOn == 1) PS5.setLed(Red);
+  else if (RumbleOn) PS5.setLed(Red);
   else PS5.setLed(Yellow);
+  // analog special features
+  if (SnapOn && !RStretch) PS5.setPlayerLed(1);
+  else if (!SnapOn && RStretch) PS5.setPlayerLed(2);
+  else if (SnapOn && RStretch) PS5.setPlayerLed(3);
+  else PS5.setPlayerLed(0);
 }
 
 void ButtonReverse() {
@@ -322,7 +379,7 @@ void ButtonReverse() {
 
 void ToggleRumble() {
   //Toggles Rumble
-    RumbleOn = !RumbleOn;
+  RumbleOn = !RumbleOn;
 }
 
 void digitalPotWrite(int address, int value) {
@@ -344,7 +401,7 @@ void serialSend(int xVal, int yVal) {
   //Serial.print(xVal);
   //Serial.print(F(" "));
   //Serial.print(yVal);
-  Serial.println(F(""));
+  //Serial.println(F(""));
 
   digitalPotWrite(channelX, xVal);
   digitalPotWrite(channelX - 1, xVal);
