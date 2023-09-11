@@ -25,6 +25,9 @@ d-pad is exact
 
 //////////////////////////////////////////////////////////////////////////*/
 
+//for testing change to 400
+const int PairTrim = 100;
+
 #include <avr/pgmspace.h>
 #include <Usb.h>
 #include <usbhub.h>
@@ -43,13 +46,17 @@ const int TrimPin = A3;
 int Butt0Pin = A4;
 int Butt1Pin = A5;
 
-const int maxX = 155;
+const int maxX = 153;
+int NewmaxX;
 const int maxY = 155;
+int NewmaxY;
 
 //flags
 int FirstRun = 0;
-int RumbleOn = 0;
 int counterDisconnect = 0;
+bool RumbleOn;
+bool SnapOn;
+bool RStretch;
 
 USB Usb;
 BTD Btd(&Usb);  // You have to create the Bluetooth Dongle instance like so
@@ -83,11 +90,11 @@ void setup() {
   float TrimPinVal = float(analogRead(TrimPin));
 
   Serial.println(F("\r\nRetroConnector XBOX Bluetooth Library Started"));
-  Serial.print("Calibration set to: ");
+  Serial.print(F("Calibration set to: "));
   Serial.println(analogRead(TrimPin));
 
-  if (TrimPinVal <= 100) {
-    Serial.println("Pairing...");
+  if (TrimPinVal <= PairTrim) {
+    Serial.println(F("Pairing..."));
     Xbox.disconnect();
     Xbox.pair();
   }
@@ -104,12 +111,17 @@ void loop() {
 
   //Calibrate all initial values to center
   float calibrate = float(analogRead(TrimPin)) / 1023.000;
-  float Xvalue = maxX * calibrate;
-  float Yvalue = maxY * calibrate;
-  float LXvalue = maxX * calibrate;
-  float LYvalue = maxY * calibrate;
-  float RXvalue = maxX * calibrate;
-  float RYvalue = maxY * calibrate;
+  float Xcenter = maxX * calibrate;
+  float Ycenter = maxY * calibrate;
+  //calculate a new max based on center - center *should* be the half way point.
+  NewmaxX = (Xcenter * 2);
+  NewmaxY = (Ycenter * 2);
+  int Xvalue;
+  int Yvalue;
+  int LXvalue;
+  int LYvalue;
+  int RXvalue;
+  int RYvalue;
 
   if (Xbox.connected()) {
 
@@ -119,11 +131,11 @@ void loop() {
       if (Xbox.getAnalogHat(LeftHatX) > 7500 || Xbox.getAnalogHat(LeftHatX) < -7500) {
         LXvalue = Xbox.getAnalogHat(LeftHatX);
       } else
-        LXvalue = maxX * calibrate;
+        LXvalue = Xcenter;
       if (Xbox.getAnalogHat(LeftHatY) > 7500 || Xbox.getAnalogHat(LeftHatY) < -7500) {
         LYvalue = Xbox.getAnalogHat(LeftHatY);
       } else
-        LYvalue = maxY * calibrate;
+        LYvalue = Ycenter;
     }
 
     //left analog takes the priority
@@ -132,36 +144,43 @@ void loop() {
       if (Xbox.getAnalogHat(RightHatX) > 7500 || Xbox.getAnalogHat(RightHatX) < -7500) {
         RXvalue = Xbox.getAnalogHat(RightHatX);
       } else
-        RXvalue = maxX * calibrate;
+        RXvalue = Xcenter;
       if (Xbox.getAnalogHat(RightHatY) > 7500 || Xbox.getAnalogHat(RightHatY) < -7500) {
         RYvalue = Xbox.getAnalogHat(RightHatY);
       } else
-        RYvalue = maxY * calibrate;
+        RYvalue = Ycenter;
     }
     // Write out left analog
     if (useLeftAnalog == 1) {
       // if its not on center, then stretch the value from 0 to twice center with a max of maxX...
       // limit range so we can reach the corners.
-      if (LXvalue != (maxX * calibrate)) LXvalue = constrain(map(LXvalue, -22768, 22768, 0, ((maxX * calibrate) * 2)), 0, maxX);
-      if (LYvalue != (maxY * calibrate)) LYvalue = constrain(map(LYvalue, -22768, 22768, 0, ((maxY * calibrate) * 2)), 0, maxY);
+      if (LXvalue != (Xcenter)) LXvalue = constrain(map(LXvalue, -22768, 22768, 0, NewmaxX), 0, NewmaxX);
+      if (LYvalue != (Ycenter)) LYvalue = constrain(map(LYvalue, -22768, 22768, 0, NewmaxY), 0, NewmaxY);
 
-      Serial.print("LAnalog: X: ");
+      Serial.print(F("LAnalog: X: "));
       Serial.print(LXvalue);
-      Serial.print(" Y: ");
+      Serial.print(F(" Y: "));
       Serial.print(LYvalue);
       Serial.println();
-      sendXYvalues(LXvalue, LYvalue);
+      if (SnapOn) CornerSnap(LXvalue, LYvalue);
+      else sendXYvalues(LXvalue, LYvalue);
     }
 
     //write out right analog
     if (useRightAnalog == 1) {
-      // full range
-      if (RXvalue != (maxX * calibrate)) RXvalue = constrain(map(RXvalue, -32768, 32768, 0, maxX), 0, maxX);
-      if (RYvalue != (maxY * calibrate)) RYvalue = constrain(map(RYvalue, -32768, 32768, 0, maxY), 0, maxY);
+      if (RStretch) {
+        // stretch
+        if (RXvalue != (Xcenter)) RXvalue = constrain(map(RXvalue, -22768, 22768, 0, NewmaxX), 0, NewmaxX);
+        if (RYvalue != (Ycenter)) RYvalue = constrain(map(RYvalue, -22768, 22768, 0, NewmaxY), 0, NewmaxY);
+      } else {
+        // full range
+        if (RXvalue != (Xcenter)) RXvalue = constrain(map(RXvalue, -32768, 32768, 0, NewmaxX), 0, NewmaxX);
+        if (RYvalue != (Ycenter)) RYvalue = constrain(map(RYvalue, -32768, 32768, 0, NewmaxY), 0, NewmaxY);
+      }
 
-      Serial.print("RAnalog: X: ");
+      Serial.print(F("RAnalog: X: "));
       Serial.print(RXvalue);
-      Serial.print(" Y: ");
+      Serial.print(F(" Y: "));
       Serial.print(RYvalue);
       Serial.println();
       sendXYvalues(RXvalue, RYvalue);
@@ -173,25 +192,25 @@ void loop() {
         Yvalue = 0;
       }
       if (Xbox.getButtonPress(DOWN)) {
-        Yvalue = maxY;
+        Yvalue = NewmaxY;
       }
     } else
-      Yvalue = maxY * calibrate;
+      Yvalue = Ycenter;
 
     if (Xbox.getButtonPress(LEFT) || Xbox.getButtonPress(RIGHT)) {
       if (Xbox.getButtonPress(LEFT)) {
         Xvalue = 0;
       }
       if (Xbox.getButtonPress(RIGHT)) {
-        Xvalue = maxX;
+        Xvalue = NewmaxX;
       }
     } else
-      Xvalue = maxX * calibrate;
+      Xvalue = Xcenter;
 
     if (useLeftAnalog == 0 && useRightAnalog == 0) {
-      Serial.print("Digital: X: ");
+      Serial.print(F("Digital: X: "));
       Serial.print(Xvalue);
-      Serial.print(" Y: ");
+      Serial.print(F(" Y: "));
       Serial.print(Yvalue);
       Serial.println();
       sendXYvalues(Xvalue, Yvalue);
@@ -206,9 +225,7 @@ void loop() {
     if (Xbox.getButtonClick(MENU)) {
       Serial.println(F("Menu"));
       //Toggles Rumble
-      if (RumbleOn == 0)
-        RumbleOn = 1;
-      else RumbleOn = 0;
+      RumbleOn = !RumbleOn;
     }
     if (Xbox.getButtonClick(XBOX)) {
       Serial.println(F("Xbox"));
@@ -219,18 +236,30 @@ void loop() {
       }
     }
 
+    if (Xbox.getButtonClick(L3)) {
+      Serial.println(F("L3"));
+      //Toggles Corner Snap
+      SnapOn = !SnapOn;
+    }
+
+    if (Xbox.getButtonClick(R3)) {
+      Serial.println(F("R3"));
+      //Toggles Corner Snap
+      RStretch = !RStretch;
+    }
+
     // Set rumble effect if rumble is off (these are for fun and to test)
-    if (RumbleOn == 1) Rumble(Xbox.getButtonPress(LT), Xbox.getButtonPress(RT));
+    if (RumbleOn) Rumble(Xbox.getButtonPress(LT), Xbox.getButtonPress(RT));
 
     // Button 0 buttons (L3 and R3 dont seem to support press)
-    if (Xbox.getButtonPress(B) || Xbox.getButtonPress(X) || Xbox.getButtonPress(RB) || Xbox.getButtonPress(LT) || Xbox.getButtonClick(L3)) {
+    if (Xbox.getButtonPress(B) || Xbox.getButtonPress(X) || Xbox.getButtonPress(RB) || Xbox.getButtonPress(LT)) {
       Serial.println(F("Button 0|1"));
       digitalWrite(Butt0Pin, HIGH);
     } else
       digitalWrite(Butt0Pin, LOW);
 
     // Button 1 buttons
-    if (Xbox.getButtonPress(A) || Xbox.getButtonPress(Y) || Xbox.getButtonPress(LB) || Xbox.getButtonPress(RT) || Xbox.getButtonClick(R3)) {
+    if (Xbox.getButtonPress(A) || Xbox.getButtonPress(Y) || Xbox.getButtonPress(LB) || Xbox.getButtonPress(RT)) {
       Serial.println(F("Button 1|0"));
       digitalWrite(Butt1Pin, HIGH);
     } else
@@ -241,19 +270,46 @@ void loop() {
     // get the stick centered even if not connected yet.
     if (FirstRun == 0) {
       FirstRun = 1;
-      Serial.print("Initial Values: X: ");
-      Serial.print(maxX * calibrate);
-      Serial.print(" Y: ");
-      Serial.println(maxY * calibrate);
-      sendXYvalues((maxX * calibrate), (maxY * calibrate));
+      Serial.print(F("Initial Values: X: "));
+      Serial.print(Xcenter);
+      Serial.print(F(" Y: "));
+      Serial.println(Ycenter);
+      sendXYvalues(Xcenter, Ycenter);
     }
   }
 }
 
 //Functions
 //////////////////////////////////////////
+
+void CornerSnap(int CXvalue, int CYvalue) {
+  //corner snap, snaps x and y into the corners when its close
+  int pullval = 20;
+  //bottom right
+  if ((CXvalue >= (NewmaxX - pullval)) && (CYvalue >= (NewmaxY - pullval))) {
+    CXvalue = NewmaxX;
+    CYvalue = NewmaxY;
+  }
+  //bottom left
+  if ((CXvalue <= pullval) && (CYvalue >= (NewmaxY - pullval))) {
+    CXvalue = 0;
+    CYvalue = NewmaxY;
+  }
+  //top right
+  if ((CXvalue >= (NewmaxX - pullval)) && (CYvalue < pullval)) {
+    CXvalue = NewmaxX;
+    CYvalue = 0;
+  }
+  //top left
+  if ((CXvalue <= pullval) && (CYvalue < pullval)) {
+    CXvalue = 0;
+    CYvalue = 0;
+  }
+  sendXYvalues(CXvalue, CYvalue);
+}
+
 void ButtonReverse() {
-  Serial.println("Buttons Reversed");
+  Serial.println(F("Buttons Reversed"));
   //  delay(1);
   if (Butt0Pin == A4) {
     Butt0Pin = A5;
