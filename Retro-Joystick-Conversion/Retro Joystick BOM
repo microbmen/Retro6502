@@ -10,6 +10,4 @@ Retro 6502 Joystick Conversion BOM
 9/50     - Orange LED with restistor - https://www.amazon.com/EDGELEC-LED-Emitting-Diffused-Colored/dp/B07PZ3TLBL/ref=sr_1_5?crid=3CIV114DYFP1V&keywords=orange%2BLED&qid=1707490191&s=industrial&sprefix=orange%2Bled%2Cindustrial%2C86&sr=1-5&th=1
 
 
-$26.68 total cost of conversion
-
 and of course the code for the ESP32.  Can be loaded using arduino IDE.
