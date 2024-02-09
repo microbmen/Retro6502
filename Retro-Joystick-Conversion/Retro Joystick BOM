@@ -1,11 +1,15 @@
 Retro 6502 Joystick Conversion BOM
 
 4.63     - USB breakout - https://www.mouser.com/ProductDetail/474-BOB-10031
-9.99     - Hitletgo ESP32 with Charging circuit - https://www.amazon.com/HiLetgo-ESP-32S-Bluetooth-Wireless-ESP-WROOM-32/dp/B077KJNVFP/ref=sr_1_2_sspa?crid=UZHJSF0YVMSA&keywords=HiLetgo+ESP32&qid=1707483846&s=electronics&sprefix=hiletgo+esp32+%2Celectronics%2C97&sr=1-2-spons&sp_csd=d2lkZ2V0TmFtZT1zcF9hdGY&psc=1
-7.99/5   - 4pin USB C lead - https://www.amazon.com/ALMOCN-Chassis-Connector-Waterproof-Charging/dp/B0CJQV4DZT/ref=dp_prsubs_sccl_3/130-7760194-1109516?pd_rd_w=9ujAD&content-id=amzn1.sym.050c5573-f60d-41d9-9d25-5aed30c19b66&pf_rd_p=050c5573-f60d-41d9-9d25-5aed30c19b66&pf_rd_r=AR1M7CX4W9K0G5Y2TCFQ&pd_rd_wg=Oe0UI&pd_rd_r=e53b91a5-e290-4553-ad54-0f7e6747daf9&pd_rd_i=B0CJQV4DZT&psc=1
+10       - Hitletgo ESP32 with Charging circuit - https://www.amazon.com/HiLetgo-ESP-32S-Bluetooth-Wireless-ESP-WROOM-32/dp/B077KJNVFP/ref=sr_1_2_sspa?crid=UZHJSF0YVMSA&keywords=HiLetgo+ESP32&qid=1707483846&s=electronics&sprefix=hiletgo+esp32+%2Celectronics%2C97&sr=1-2-spons&sp_csd=d2lkZ2V0TmFtZT1zcF9hdGY&psc=1
+26/4     - 3.7v batt (reverse the leads!!!!) - https://www.amazon.com/dp/B08VRYS8FT?ref=ppx_yo2ov_dt_b_product_details&th=1
+8/5      - 4pin USB C lead - https://www.amazon.com/ALMOCN-Chassis-Connector-Waterproof-Charging/dp/B0CJQV4DZT/ref=dp_prsubs_sccl_3/130-7760194-1109516?pd_rd_w=9ujAD&content-id=amzn1.sym.050c5573-f60d-41d9-9d25-5aed30c19b66&pf_rd_p=050c5573-f60d-41d9-9d25-5aed30c19b66&pf_rd_r=AR1M7CX4W9K0G5Y2TCFQ&pd_rd_wg=Oe0UI&pd_rd_r=e53b91a5-e290-4553-ad54-0f7e6747daf9&pd_rd_i=B0CJQV4DZT&psc=1
 3 ?      - PCB for v-divide - https://github.com/microbmen/Retro6502/tree/main/Retro-Joystick-Conversion/PCB
-12.49/50 - Tiny pins to take up less space - https://www.amazon.com/gp/product/B01GKJZ310/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1
+12.5/50  - Tiny pins to take up less space - https://www.amazon.com/gp/product/B01GKJZ310/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1
 0.46     - 47k resistors - https://www.mouser.com/ProductDetail/KOA-Speer/CF1-4LVTR473J?qs=L8dXaWgE8oh%252BE0yn6HXkMQ%3D%3D
-8.99/50  - Orange LED with restistor - https://www.amazon.com/EDGELEC-LED-Emitting-Diffused-Colored/dp/B07PZ3TLBL/ref=sr_1_5?crid=3CIV114DYFP1V&keywords=orange%2BLED&qid=1707490191&s=industrial&sprefix=orange%2Bled%2Cindustrial%2C86&sr=1-5&th=1
+9/50     - Orange LED with restistor - https://www.amazon.com/EDGELEC-LED-Emitting-Diffused-Colored/dp/B07PZ3TLBL/ref=sr_1_5?crid=3CIV114DYFP1V&keywords=orange%2BLED&qid=1707490191&s=industrial&sprefix=orange%2Bled%2Cindustrial%2C86&sr=1-5&th=1
+
+
+$26.68 total cost of conversion
 
 and of course the code for the ESP32.  Can be loaded using arduino IDE.
